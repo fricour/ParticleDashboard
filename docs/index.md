@@ -74,7 +74,13 @@ const argo_filtered = argo.filter(d =>
   pickSizeClass.includes(d.size) && 
   pickDepth.includes(d.park_depth) &&
   pickFloat.includes(d.wmo)
-);                                
+);   
+
+// filter particle size spectra
+const pss_filtered = size_spectra.filter(d => 
+  pickDepth.includes(d.park_depth) &&
+  pickFloat.includes(d.wmo)
+);   
 ```
 
 ```js
@@ -85,7 +91,7 @@ const colorPalette = [
 ];
 
 // Create a color scale based on unique WMO values
-const wmoValues = [...new Set(argo_filtered.map(d => d.wmo))];
+const wmoValues = [...new Set(argo.map(d => d.wmo))];
 const colorScale = d3.scaleOrdinal()
   .domain(wmoValues)
   .range(colorPalette);
@@ -93,8 +99,8 @@ const colorScale = d3.scaleOrdinal()
 
 ```js
 // show table
-//Inputs.table(argo)
-Inputs.table(size_spectra)
+Inputs.table(argo_filtered)
+//Inputs.table(size_spectra)
 ```
 
 ```js
@@ -103,7 +109,7 @@ const div = display(document.createElement("div"));
 div.style = "height: 400px;";
 
 const map = L.map(div)
-  .setView([0, 0], 1); // centered on Greenwich, zoom level 2
+  .setView([0, 180], 2); // centered on Greenwich, zoom level 2
 
 L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
   maxZoom: 19, 
@@ -173,10 +179,10 @@ const particle_plot = Plot.plot({
     label: "Date",
     //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
   },
-  color: {
-    legend: true,  // Add a color legend
-    label: "WMO"
-  },
+  //color: {
+  //  legend: true,  // Add a color legend
+  //  label: "WMO"
+  //},
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
   style: {
@@ -186,6 +192,45 @@ const particle_plot = Plot.plot({
   marginRight: 100  // Add right margin for the legend
 })
 ```
+
+```js
+// Particle size spectra plot
+const pss_plot = Plot.plot({
+  marks: [
+    Plot.dot(pss_filtered, {
+      y: "mean_slope",
+      x: "date",
+      fill: d => colorScale(d.wmo),  // Use the custom color scale
+      r: 3
+    }),
+    Plot.tip(pss_filtered, Plot.pointer({
+      y: "mean_slope",
+      x: "date",
+      title: d => `WMO: ${d.wmo}\nDate: ${d.date}}`
+    }))
+  ],
+  y: {
+    label: "Mean slope",
+    reverse: false
+  },
+  x: {
+    label: "Date",
+    //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
+  },
+  //color: {
+  //  legend: true,  // Add a color legend
+  //  label: "WMO"
+  //},
+  width: 800,  // Increased width for better visibility
+  height: 500,  // Increased height for better visibility
+  style: {
+    fontFamily: "sans-serif",
+    fontSize: 12
+  },
+  marginRight: 100  // Add right margin for the legend
+})
+```
+
 ```js
 // taken from https://raw.githubusercontent.com/observablehq/framework/main/examples/eia/src/index.md
 function centerResize(render) {
@@ -195,6 +240,37 @@ function centerResize(render) {
   div.style.alignItems = "center";
   return div;
 }
+```
+
+```js
+//
+// Big thanks to ClaudeAI ...
+//
+// get max concentration value for the filtered argo dataframe
+const concentrations = argo_filtered.map(row => parseFloat(row.concentration));
+// Calculate max
+const maxConcentration = Math.max(...concentrations);
+
+// Calculate mean
+const sumConcentration = concentrations.reduce((sum, value) => sum + value, 0);
+const meanConcentration = sumConcentration / concentrations.length;
+
+// Calculate median
+const sortedConcentrations = [...concentrations].sort((a, b) => a - b);
+const midpoint = Math.floor(sortedConcentrations.length / 2);
+const medianConcentration = 
+  sortedConcentrations.length % 2 !== 0
+    ? sortedConcentrations[midpoint]
+    : (sortedConcentrations[midpoint - 1] + sortedConcentrations[midpoint]) / 2;
+
+// Round values if needed
+const roundToDecimalPlaces = (value, places) => Number(value.toFixed(places));
+
+const roundedMean = roundToDecimalPlaces(meanConcentration, 2);
+const roundedMedian = roundToDecimalPlaces(medianConcentration, 2);
+
+// create input
+const pointMax = Inputs.range([0, maxConcentration], {step: 1, value: maxConcentration, width: 60});
 ```
 
 <div class="grid grid-cols-4">
@@ -207,9 +283,14 @@ function centerResize(render) {
   </div>
   <div class="card grid-colspan-2 grid-rowspan-1">
     <h2><strong>Particle size spectra</strong></h2>
+    <h3>Mean slope of particle size spectra</h3>
 </div>
 
 <div class="card grid-colspan-2 grid-rowspan-1">
   <h2><strong>Particle concentrations</strong></h2>
+  <h3>Filter points out by decreasing the maximum concentration value</h3>
+  <div style="display: flex; flex-direction: column; align-items: center;">
+    <div>${pointMax}</div>
+  </div>
   ${particle_plot}
 </div>
