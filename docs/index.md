@@ -24,6 +24,12 @@ const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 
 // Size spectra data
 const size_spectra = FileAttachment("size_spectra.csv").csv({typed: true});
+
+// OST data
+const ost_data = FileAttachment("optical_sediment_trap.csv").csv({typed: true});
+```
+
+```js
 ```
 
 ```js
@@ -81,6 +87,12 @@ const pss_filtered = size_spectra.filter(d =>
   pickDepth.includes(d.park_depth) &&
   pickFloat.includes(d.wmo)
 );   
+
+// filter optical sediment trap data
+const ost_filtered = ost_data.filter(d => 
+  pickDepth.includes(d.park_depth) &&
+  pickFloat.includes(d.wmo)
+);   
 ```
 
 ```js
@@ -99,8 +111,9 @@ const colorScale = d3.scaleOrdinal()
 
 ```js
 // show table
-Inputs.table(argo_filtered)
+//Inputs.table(argo_filtered)
 //Inputs.table(size_spectra)
+Inputs.table(ost_data)
 ```
 
 ```js
@@ -232,6 +245,44 @@ const pss_plot = Plot.plot({
 ```
 
 ```js
+// Optical sediment trap plot
+const ost_plot = Plot.plot({
+  marks: [
+    Plot.dot(ost_filtered, {
+      y: "small_flux",
+      x: "max_time",
+      fill: d => colorScale(d.wmo),  // Use the custom color scale
+      r: 3
+    }),
+    Plot.tip(ost_filtered, Plot.pointer({
+      y: "small_flux",
+      x: "max_time",
+      title: d => `WMO: ${d.wmo}\nDate: ${d.max_time}\nSmall flux: ${d.small_flux}`
+    }))
+  ],
+  y: {
+    label: "Small particle flux",
+    reverse: false
+  },
+  x: {
+    label: "Date",
+    //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
+  },
+  //color: {
+  //  legend: true,  // Add a color legend
+  //  label: "WMO"
+  //},
+  width: 800,  // Increased width for better visibility
+  height: 500,  // Increased height for better visibility
+  style: {
+    fontFamily: "sans-serif",
+    fontSize: 12
+  },
+  marginRight: 100  // Add right margin for the legend
+})
+```
+
+```js
 // taken from https://raw.githubusercontent.com/observablehq/framework/main/examples/eia/src/index.md
 function centerResize(render) {
   const div = resize(render);
@@ -284,6 +335,7 @@ const pointMax = Inputs.range([0, maxConcentration], {step: 1, value: maxConcent
   <div class="card grid-colspan-2 grid-rowspan-1">
     <h2><strong>Particle size spectra</strong></h2>
     <h3>Mean slope of particle size spectra</h3>
+    ${pss_plot}
 </div>
 
 <div class="card grid-colspan-2 grid-rowspan-1">
@@ -293,4 +345,10 @@ const pointMax = Inputs.range([0, maxConcentration], {step: 1, value: maxConcent
     <div>${pointMax}</div>
   </div>
   ${particle_plot}
+</div>
+
+<div class="card grid-colspan-2 grid-rowspan-1">
+  <h2><strong>Optical sediment trap</strong></h2>
+  <h3>Small particle flux</h3>
+  ${ost_plot}
 </div>
