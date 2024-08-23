@@ -1,5 +1,9 @@
 ---
 theme: dashboard
+sql: 
+  particle: ./.observablehq/cache/LPM_data.parquet
+  ost: ./.observablehq/cache/optical_sediment_trap.parquet
+  pss: ./.observablehq/cache/size_spectra.parquet
 ---
 
 # Particles data from Biogeochemical-Argo floats
@@ -7,36 +11,55 @@ theme: dashboard
 ## Data from [Argo GDAC](http://www.argodatamgt.org/Access-to-data/Argo-GDAC-ftp-https-and-s3-servers)
 
 ```js
-// import leaftlet library (note, it is imported implicitly in the Observable framework), see https://observablehq.com/framework/lib/leaflet
-import * as L from "npm:leaflet";
-```
-
-```js
 //
-// Load data snapshots
+// Load data snapshots (big datasets are loaded with SQL (and duckDB behind the scenes, see the specifications at the top of the file))
 //
 
+// changed my mind with this resource https://observablehq.com/framework/sql for the big dataset (not the trajectory one for the leaflet map)
 // Particle data
-const argo = FileAttachment("LPM_data.csv").csv({typed: true});
+//const argo = FileAttachment("LPM_data.csv").csv({typed: true});
+//const argo = FileAttachment("LPM_data.parquet").parquet();
+//const argo = DuckDBClient.of({LPM_data: FileAttachment("LPM_data.parquet")});
 
 // Trajectory data
 const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 
 // Size spectra data
-const size_spectra = FileAttachment("size_spectra.csv").csv({typed: true});
+//const size_spectra = FileAttachment("size_spectra.csv").csv({typed: true});
 
 // OST data
-const ost_data = FileAttachment("optical_sediment_trap.csv").csv({typed: true});
+//const ost_data = FileAttachment("optical_sediment_trap.csv").csv({typed: true});
 ```
 
 ```js
+// declaration of key variables
+
+// particle size classes
+const lpm_classes = ['NP_Size_50.8','NP_Size_64','NP_Size_80.6', 'NP_Size_102','NP_Size_128','NP_Size_161','NP_Size_203',
+                       'NP_Size_256','NP_Size_323','NP_Size_406','NP_Size_512','NP_Size_645','NP_Size_813','NP_Size_1020','NP_Size_1290',
+                       'NP_Size_1630','NP_Size_2050','NP_Size_2580']
+
+// wmos (unique id for BGC-Argo floats)
+const wmo = ['1902578', '1902593', '1902601', '1902637', '1902685', '2903783', '2903787', '2903794', '3902471', '3902498', '4903634', '4903657', '4903658', '4903660', '4903739', '4903740', '5906970', '6904240', '6904241', '6990503', '6990514', '7901028']
+
+// parking depths
+const park_depths = ['200 m', '500 m', '1000 m']
+
+// Define a custom color palette (colorblind-friendly)
+const colorPalette = [
+  "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
+  "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
+];
 ```
 
 ```js
+//
+// input declarations
+//
 // define user inputs
 const pickSizeClass = view(
   Inputs.select(
-    argo.map((d) => d.size),
+    lpm_classes,
     {
       multiple: false,
       label: "Pick a size class:",
@@ -49,7 +72,7 @@ const pickSizeClass = view(
 
 const pickDepth = view(
   Inputs.select(
-    argo.map((d) => d.park_depth),
+    park_depths,
     {
       multiple: false,
       label: "Pick a depth:",
@@ -62,62 +85,50 @@ const pickDepth = view(
 
 const pickFloat = view(
   Inputs.select(
-    argo.map((d) => d.wmo),
+   wmo,
     {
-      multiple: true,
+      multiple: false,
       label: "Pick a float:",
       unique: true,
       sort: false,
-      value: "6904240"
+      value: "1902578"
     }
   )
 );
 ```
 
-```js
-// filter data based on user input
-const argo_filtered = argo.filter(d => 
-  pickSizeClass.includes(d.size) && 
-  pickDepth.includes(d.park_depth) &&
-  pickFloat.includes(d.wmo)
-);   
+```sql id=particle_filtered display
+SELECT park_depth, wmo, size, concentration, juld
+FROM particle
+WHERE size = ${pickSizeClass}
+  AND park_depth = ${pickDepth}
+  AND wmo IN (${pickFloat})
+```
 
-// filter particle size spectra
-const pss_filtered = size_spectra.filter(d => 
-  pickDepth.includes(d.park_depth) &&
-  pickFloat.includes(d.wmo)
-);   
+```sql id=ost_filtered display
+SELECT * 
+FROM ost
+WHERE park_depth = ${pickDepth}
+  AND wmo IN (${pickFloat})
+```
 
-// filter optical sediment trap data
-const ost_filtered = ost_data.filter(d => 
-  pickDepth.includes(d.park_depth) &&
-  pickFloat.includes(d.wmo)
-);   
+```sql id=pss_filtered display
+SELECT *
+FROM pss
+WHERE park_depth = ${pickDepth}
+  AND wmo IN (${pickFloat})
 ```
 
 ```js
-// Define a custom color palette (colorblind-friendly)
-const colorPalette = [
-  "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
-  "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
-];
-
 // Create a color scale based on unique WMO values
-const wmoValues = [...new Set(argo.map(d => d.wmo))];
 const colorScale = d3.scaleOrdinal()
-  .domain(wmoValues)
+  .domain(wmo)
   .range(colorPalette);
 ```
 
 ```js
-// show table
-//Inputs.table(argo_filtered)
-//Inputs.table(size_spectra)
-Inputs.table(ost_data)
-```
-
-```js
 // leaflet map to plot floats' trajectories
+// made with Claude Ai
 const div = display(document.createElement("div"));
 div.style = "height: 400px;";
 
@@ -172,16 +183,16 @@ const group = L.featureGroup(allPolylines);
 // Create the particle plot (when floats have reached their parking depth)
 const particle_plot = Plot.plot({
   marks: [
-    Plot.dot(argo_filtered, {
+    Plot.dot(particle_filtered, {
       y: "concentration",
       x: "juld",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
       r: 3
     }),
-    Plot.tip(argo_filtered, Plot.pointer({
+    Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
-      title: d => `WMO: ${d.wmo}\nDepth: ${d.depth.toFixed(1)} m\nDate: ${d.juld}\nConcentration: ${d.concentration.toFixed(2)}`
+      //title: d => `WMO: ${d.wmo}\nDate: ${d.juld}\nConcentration: ${d.concentration.toFixed(2)}`
     }))
   ],
   y: {
@@ -219,7 +230,7 @@ const pss_plot = Plot.plot({
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
-      title: d => `WMO: ${d.wmo}\nDate: ${d.date}}`
+      title: d => `WMO: ${d.wmo}\nDate: ${d.date}`
     }))
   ],
   y: {
@@ -257,7 +268,7 @@ const ost_plot = Plot.plot({
     Plot.tip(ost_filtered, Plot.pointer({
       y: "small_flux",
       x: "max_time",
-      title: d => `WMO: ${d.wmo}\nDate: ${d.max_time}\nSmall flux: ${d.small_flux}`
+      title: d => `WMO: ${d.wmo}\nDate: ${d.max_time}\nSmall flux: ${d.small_flux.toFixed(2)}`
     }))
   ],
   y: {
@@ -283,45 +294,8 @@ const ost_plot = Plot.plot({
 ```
 
 ```js
-// taken from https://raw.githubusercontent.com/observablehq/framework/main/examples/eia/src/index.md
-function centerResize(render) {
-  const div = resize(render);
-  div.style.display = "flex";
-  div.style.flexDirection = "column";
-  div.style.alignItems = "center";
-  return div;
-}
-```
-
-```js
-//
-// Big thanks to ClaudeAI ...
-//
-// get max concentration value for the filtered argo dataframe
-const concentrations = argo_filtered.map(row => parseFloat(row.concentration));
-// Calculate max
-const maxConcentration = Math.max(...concentrations);
-
-// Calculate mean
-const sumConcentration = concentrations.reduce((sum, value) => sum + value, 0);
-const meanConcentration = sumConcentration / concentrations.length;
-
-// Calculate median
-const sortedConcentrations = [...concentrations].sort((a, b) => a - b);
-const midpoint = Math.floor(sortedConcentrations.length / 2);
-const medianConcentration = 
-  sortedConcentrations.length % 2 !== 0
-    ? sortedConcentrations[midpoint]
-    : (sortedConcentrations[midpoint - 1] + sortedConcentrations[midpoint]) / 2;
-
-// Round values if needed
-const roundToDecimalPlaces = (value, places) => Number(value.toFixed(places));
-
-const roundedMean = roundToDecimalPlaces(meanConcentration, 2);
-const roundedMedian = roundToDecimalPlaces(medianConcentration, 2);
-
 // create input
-const pointMax = Inputs.range([0, maxConcentration], {step: 1, value: maxConcentration, width: 60});
+const pointMax = Inputs.range([0, 10], {step: 1, value: 10, width: 60});
 ```
 
 <div class="grid grid-cols-4">

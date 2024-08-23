@@ -1,9 +1,10 @@
 library(ncdf4)
 library(tidyverse)
-library(readr)
+#library(readr)
 library(oce)
 library(lubridate)
 library(purrr)
+library(arrow)
 
 extract_LPM <- function(ncfile){
 
@@ -84,7 +85,7 @@ extract_LPM <- function(ncfile){
 }
 
 # extract data
-WMO <- c(3902498, 6904241, 2903783, 1902593, 4903657, 5906970, 4903634, 1902578, 3902471, 4903658, 6990503, 2903787, 4903660, 6990514, 1902601, 4903739, 1902637, 4903740, 2903794, 1902685, 6904240, 7901028)
+WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028)
 # NOTE: 6904094 does not have Traj file and 6904093 does have the same var names than the others....
 #WMO <- c(1902685, 6904240, 7901028)
 tmp <- map_dfr(WMO, ~extract_LPM(paste0("/home/fricour/test/argo_trajectory_files/", .x, "/", .x, "_Rtraj_aux.nc"))) |>
@@ -97,4 +98,11 @@ tmp <- tmp %>%
     pivot_longer(cols = starts_with("NP_Size_"), names_to = "size", values_to = "concentration")
 
 # example here: https://github.com/observablehq/data-loader-examples/blob/main/docs/data/penguin-kmeans.csv.R
-cat(format_csv(tmp))
+#cat(format_csv(tmp))
+
+# based on https://github.com/observablehq/framework/issues/915 and https://github.com/observablehq/framework/issues/873
+# Write the data frame to a temporary Parquet file
+temp_file <- tempfile(fileext = ".parquet")
+arrow::write_parquet(tmp, sink = temp_file)
+
+system2('/bin/cat', args = temp_file)

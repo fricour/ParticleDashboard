@@ -302,8 +302,12 @@ extract_ost_data <- function(wmo_float, path_to_data){
 
 path_to_data <- '/home/fricour/test/argo_core_trajectory_files/'
 
-WMO <- c(3902498, 6904241, 2903783, 1902593, 4903657, 5906970, 4903634, 1902578, 3902471, 4903658, 6990503, 2903787, 4903660, 6990514, 1902601, 4903739, 1902637, 4903740, 2903794, 1902685, 6904240, 7901028)
+WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028)
 
 tmp <- purrr::map_dfr(WMO, extract_ost_data, path_to_data = path_to_data)
 
-cat(readr::format_csv(tmp))
+#cat(readr::format_csv(tmp))
+temp_file <- tempfile(fileext = ".parquet")
+arrow::write_parquet(tmp, sink = temp_file)
+
+system2('/bin/cat', args = temp_file)
