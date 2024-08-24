@@ -95,7 +95,8 @@ tmp <- map_dfr(WMO, ~extract_LPM(paste0("/home/fricour/test/argo_trajectory_file
 #tmp$juld <- format(tmp$juld, "%Y-%m-%d")
 tmp <- tmp %>%
     mutate(across(where(~ is.array(.x)), ~ as.double(unlist(.)))) %>%
-    pivot_longer(cols = starts_with("NP_Size_"), names_to = "size", values_to = "concentration")
+    pivot_longer(cols = starts_with("NP_Size_"), names_to = "size", values_to = "concentration") |>
+    mutate(size = as.numeric(str_split_i(size, '_', 3)))
 
 # example here: https://github.com/observablehq/data-loader-examples/blob/main/docs/data/penguin-kmeans.csv.R
 #cat(format_csv(tmp))

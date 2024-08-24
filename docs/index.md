@@ -17,19 +17,15 @@ sql:
 
 // changed my mind with this resource https://observablehq.com/framework/sql for the big dataset (not the trajectory one for the leaflet map)
 // Particle data
-//const argo = FileAttachment("LPM_data.csv").csv({typed: true});
 //const argo = FileAttachment("LPM_data.parquet").parquet();
-//const argo = DuckDBClient.of({LPM_data: FileAttachment("LPM_data.parquet")});
 
 // Trajectory data
 const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 
 // Size spectra data
-//const size_spectra = FileAttachment("size_spectra.csv").csv({typed: true});
 //const size_spectra = FileAttachment("size_spectra.parquet").parquet();
 
 // OST data
-//const ost_data = FileAttachment("optical_sediment_trap.csv").csv({typed: true});
 //const ost_data = FileAttachment("optical_sediment_trap.parquet").parquet();
 ```
 
@@ -37,9 +33,7 @@ const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 // declaration of key variables
 
 // particle size classes
-const lpm_classes = ['NP_Size_50.8','NP_Size_64','NP_Size_80.6', 'NP_Size_102','NP_Size_128','NP_Size_161','NP_Size_203',
-                       'NP_Size_256','NP_Size_323','NP_Size_406','NP_Size_512','NP_Size_645','NP_Size_813','NP_Size_1020','NP_Size_1290',
-                       'NP_Size_1630','NP_Size_2050','NP_Size_2580']
+const lpm_classes = [50.8, 64, 80.6, 102, 128, 161, 203, 256, 323, 406, 512, 645, 813, 1020, 1290, 1630, 2050, 2580]
 
 // wmos (unique id for BGC-Argo floats)
 const wmo = [1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028]
@@ -67,7 +61,7 @@ const pickSizeClass = view(
       label: "Pick a size class:",
       unique: true,
       sort: false,
-      value: "NP_Size_50.8"
+      value: 102
     }
   )
 );
@@ -106,11 +100,11 @@ const pickFloat = view(
 //WHERE size = ${pickSizeClass}
 //  AND park_depth = ${pickDepth}
 //  AND wmo IN (${pickFloat})
-// does not work with the IN 
+// does not work with the IN operator
 const particle_filtered = await sql([`SELECT * park_depth, WMO, size, concentration, juld 
                                       FROM particle 
                                       WHERE park_depth IN (${[pickDepth]}) 
-                                      AND size = 'NP_Size_102' 
+                                      AND size IN (${[pickSizeClass]}) 
                                       AND wmo IN (${[pickFloat]})`])
 
 const ost_filtered = await sql([`SELECT * 
@@ -207,10 +201,6 @@ const particle_plot = Plot.plot({
     label: "Date",
     //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
   },
-  //color: {
-  //  legend: true,  // Add a color legend
-  //  label: "WMO"
-  //},
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
   style: {
@@ -245,10 +235,6 @@ const pss_plot = Plot.plot({
     label: "Date",
     //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
   },
-  //color: {
-  //  legend: true,  // Add a color legend
-  //  label: "WMO"
-  //},
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
   style: {
@@ -283,10 +269,6 @@ const ost_plot = Plot.plot({
     label: "Date",
     //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
   },
-  //color: {
-  //  legend: true,  // Add a color legend
-  //  label: "WMO"
-  //},
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
   style: {
