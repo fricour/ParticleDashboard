@@ -117,7 +117,7 @@ compute_spectral_slope <- function(wmo_float, path_to_data){
   data <- data |>
     dplyr::select(-dplyr::all_of(lpm_classes)) |>
     dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500))) |>
-    dplyr::mutate(date = as.Date(juld)) |>
+    dplyr::mutate(date = lubridate::as_datetime(juld)) |>
     dplyr::group_by(wmo, cycle, park_depth, date) |>
     dplyr::summarize(mean_slope = mean(spectral_slope, na.rm=T))
 
@@ -149,6 +149,7 @@ compute_slope <- function(i, data_spectra, mid_DSE, size_bin){
 }
 
 WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028)
+
 tmp <- purrr::map_dfr(WMO, compute_spectral_slope, path_to_data = '/home/fricour/test/argo_trajectory_files/')
 
 # clean for format_csv

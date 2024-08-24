@@ -190,7 +190,7 @@ const particle_plot = Plot.plot({
     Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
-      title: d => `WMO: ${d.wmo}\nDate: ${d.juld}\nConcentration: ${d.concentration.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nConcentration: ${d.concentration.toFixed(2)}`
     }))
   ],
   y: {
@@ -198,8 +198,7 @@ const particle_plot = Plot.plot({
     reverse: false
   },
   x: {
-    label: "Date",
-    //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
+    label: "Date"
   },
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
@@ -224,7 +223,7 @@ const pss_plot = Plot.plot({
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
-      title: d => `WMO: ${d.wmo}\nDate: ${d.date}\nMean slope: ${d.mean_slope.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nMean slope: ${d.mean_slope.toFixed(2)}`
     }))
   ],
   y: {
@@ -232,8 +231,7 @@ const pss_plot = Plot.plot({
     reverse: false
   },
   x: {
-    label: "Date",
-    //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
+    label: "Date"
   },
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
@@ -258,7 +256,7 @@ const ost_plot = Plot.plot({
     Plot.tip(ost_filtered, Plot.pointer({
       y: "small_flux",
       x: "max_time",
-      title: d => `WMO: ${d.wmo}\nDate: ${d.max_time}\nSmall flux: ${d.small_flux.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}`
     }))
   ],
   y: {
@@ -266,8 +264,7 @@ const ost_plot = Plot.plot({
     reverse: false
   },
   x: {
-    label: "Date",
-    //tickFormat: "%b %Y"  // Format x-axis ticks as month and year
+    label: "Date"
   },
   width: 800,  // Increased width for better visibility
   height: 500,  // Increased height for better visibility
