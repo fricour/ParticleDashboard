@@ -59,7 +59,7 @@ extract_LPM <- function(ncfile){
 
       # define "standard" parking depths (200 m, 500 m and 1000 m)
       part_spectra <- part_spectra |>
-       dplyr::mutate(park_depth = dplyr::if_else(depth < 350, '200 m', dplyr::if_else(depth > 750, '1000 m', '500 m')))
+       dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500)))
 
       # reorder tibble
       part_spectra <- part_spectra |>
@@ -116,7 +116,7 @@ compute_spectral_slope <- function(wmo_float, path_to_data){
   # clean data and compute daily mean slope
   data <- data |>
     dplyr::select(-dplyr::all_of(lpm_classes)) |>
-    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, '200 m', dplyr::if_else(depth > 750, '1000 m', '500 m'))) |>
+    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500))) |>
     dplyr::mutate(date = as.Date(juld)) |>
     dplyr::group_by(wmo, cycle, park_depth, date) |>
     dplyr::summarize(mean_slope = mean(spectral_slope, na.rm=T))

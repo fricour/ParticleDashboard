@@ -26,9 +26,11 @@ const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 
 // Size spectra data
 //const size_spectra = FileAttachment("size_spectra.csv").csv({typed: true});
+//const size_spectra = FileAttachment("size_spectra.parquet").parquet();
 
 // OST data
 //const ost_data = FileAttachment("optical_sediment_trap.csv").csv({typed: true});
+//const ost_data = FileAttachment("optical_sediment_trap.parquet").parquet();
 ```
 
 ```js
@@ -40,10 +42,10 @@ const lpm_classes = ['NP_Size_50.8','NP_Size_64','NP_Size_80.6', 'NP_Size_102','
                        'NP_Size_1630','NP_Size_2050','NP_Size_2580']
 
 // wmos (unique id for BGC-Argo floats)
-const wmo = ['1902578', '1902593', '1902601', '1902637', '1902685', '2903783', '2903787', '2903794', '3902471', '3902498', '4903634', '4903657', '4903658', '4903660', '4903739', '4903740', '5906970', '6904240', '6904241', '6990503', '6990514', '7901028']
+const wmo = [1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028]
 
 // parking depths
-const park_depths = ['200 m', '500 m', '1000 m']
+const park_depths = [200, 500, 1000]
 
 // Define a custom color palette (colorblind-friendly)
 const colorPalette = [
@@ -71,52 +73,55 @@ const pickSizeClass = view(
 );
 
 const pickDepth = view(
-  Inputs.select(
+  Inputs.checkbox(
     park_depths,
     {
-      multiple: false,
+      multiple: true,
       label: "Pick a depth:",
       unique: true,
       sort: false,
-      value: "1000 m"
+      value: [200]
     }
   )
-);
+)
 
 const pickFloat = view(
   Inputs.select(
    wmo,
     {
-      multiple: false,
+      multiple: 5,
       label: "Pick a float:",
       unique: true,
       sort: false,
-      value: "1902578"
+      value: [1902578]
     }
   )
 );
 ```
 
-```sql id=particle_filtered display
-SELECT park_depth, wmo, size, concentration, juld
-FROM particle
-WHERE size = ${pickSizeClass}
-  AND park_depth = ${pickDepth}
-  AND wmo IN (${pickFloat})
-```
+```js
+// switched to this because the sql query
+//SELECT park_depth, wmo, size, concentration, juld
+//FROM particle
+//WHERE size = ${pickSizeClass}
+//  AND park_depth = ${pickDepth}
+//  AND wmo IN (${pickFloat})
+// does not work with the IN 
+const particle_filtered = await sql([`SELECT * park_depth, WMO, size, concentration, juld 
+                                      FROM particle 
+                                      WHERE park_depth IN (${[pickDepth]}) 
+                                      AND size = 'NP_Size_102' 
+                                      AND wmo IN (${[pickFloat]})`])
 
-```sql id=ost_filtered display
-SELECT * 
-FROM ost
-WHERE park_depth = ${pickDepth}
-  AND wmo IN (${pickFloat})
-```
-
-```sql id=pss_filtered display
-SELECT *
-FROM pss
-WHERE park_depth = ${pickDepth}
-  AND wmo IN (${pickFloat})
+const ost_filtered = await sql([`SELECT * 
+                                 FROM ost 
+                                 WHERE park_depth IN (${[pickDepth]}) 
+                                 AND wmo IN (${[pickFloat]})`])    
+                                 
+const pss_filtered = await sql([`SELECT *
+                                 FROM pss
+                                 WHERE park_depth IN (${[pickDepth]}) 
+                                 AND wmo IN (${[pickFloat]})`])
 ```
 
 ```js
@@ -176,7 +181,6 @@ groupedData.forEach((floatData, wmo) => {
 
 // Create a feature group from all polylines
 const group = L.featureGroup(allPolylines);
-
 ```
 
 ```js
@@ -192,7 +196,7 @@ const particle_plot = Plot.plot({
     Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
-      //title: d => `WMO: ${d.wmo}\nDate: ${d.juld}\nConcentration: ${d.concentration.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nDate: ${d.juld}\nConcentration: ${d.concentration.toFixed(2)}`
     }))
   ],
   y: {
@@ -230,7 +234,7 @@ const pss_plot = Plot.plot({
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
-      title: d => `WMO: ${d.wmo}\nDate: ${d.date}`
+      title: d => `WMO: ${d.wmo}\nDate: ${d.date}\nMean slope: ${d.mean_slope.toFixed(2)}`
     }))
   ],
   y: {

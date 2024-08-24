@@ -112,7 +112,7 @@ extract_cp_data <- function(wmo, path_to_data){
   tib <- tib %>%
     dplyr::filter(cycle >= 1, mc == 290) %>%
     tidyr::drop_na(cp) %>%
-    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, '200 m', dplyr::if_else(depth > 750, '1000 m', '500 m'))) %>%
+    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500))) %>%
     dplyr::select(-mc)
 
   # # convert cp data to physical data
@@ -275,7 +275,7 @@ derive_ost_flux <- function(data, wmo_float){
 extract_ost_data <- function(wmo_float, path_to_data){
 
   # parking depths (so far we only have those 3 but that might change in the future)
-  park_depth <- c('200 m', '500 m', '1000 m')
+  park_depth <- c(200, 500, 1000)
 
   # extract cp data from the float
   data <- extract_cp_data(wmo_float, path_to_data)
