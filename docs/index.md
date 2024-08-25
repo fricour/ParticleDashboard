@@ -74,10 +74,10 @@ const pickDepth = view(
       label: "Pick a depth:",
       unique: true,
       sort: false,
-      value: [200]
+      value: [1000]
     }
   )
-)
+);
 
 const pickFloat = view(
   Inputs.select(
@@ -107,6 +107,8 @@ const particle_filtered = await sql([`SELECT * park_depth, WMO, size, concentrat
                                       AND size IN (${[pickSizeClass]}) 
                                       AND wmo IN (${[pickFloat]})`])
 
+const maxConcentration = d3.max(particle_filtered, d => d.concentration);
+
 const ost_filtered = await sql([`SELECT * 
                                  FROM ost 
                                  WHERE park_depth IN (${[pickDepth]}) 
@@ -117,6 +119,7 @@ const pss_filtered = await sql([`SELECT *
                                  WHERE park_depth IN (${[pickDepth]}) 
                                  AND wmo IN (${[pickFloat]})`])
 ```
+
 
 ```js
 // Create a color scale based on unique WMO values
@@ -181,17 +184,18 @@ const group = L.featureGroup(allPolylines);
 // Create the particle plot (when floats have reached their parking depth)
 const particle_plot = Plot.plot({
   marks: [
-    Plot.dot(particle_filtered, {
+    Plot.dot(particle_filtered, Plot.hexbin({r: "count", fill: "min"}, {
       y: "concentration",
       x: "juld",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
       r: 3
-    }),
+    })),
     Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
       title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nConcentration: ${d.concentration.toFixed(2)}`
-    }))
+    })),
+    Plot.lineY(particle_filtered, Plot.windowY({k:60, reduce: "median"}, {x: "juld", y: "concentration", stroke: "transparent", strokeWidth: 5}))
   ],
   y: {
     label: "Concentration (#/L)",
@@ -218,13 +222,14 @@ const pss_plot = Plot.plot({
       y: "mean_slope",
       x: "date",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
-      r: 3
+      r: 1
     }),
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
       title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nMean slope: ${d.mean_slope.toFixed(2)}`
-    }))
+    })),
+    Plot.lineY(pss_filtered, Plot.windowY({k:12, reduce: "median"}, {x: "date", y: "mean_slope", stroke: d => colorScale(d.wmo), strokeWidth: 4}))
   ],
   y: {
     label: "Mean slope",
@@ -251,13 +256,14 @@ const ost_plot = Plot.plot({
       y: "small_flux",
       x: "max_time",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
-      r: 3
+      r: 2
     }),
     Plot.tip(ost_filtered, Plot.pointer({
       y: "small_flux",
       x: "max_time",
       title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}`
-    }))
+    })),
+    Plot.lineY(ost_filtered, Plot.windowY({k:12, reduce: "median"}, {x: "max_time", y: "small_flux", stroke: d => colorScale(d.wmo), strokeWidth: 4})),
   ],
   y: {
     label: "Small particle flux",
@@ -277,11 +283,10 @@ const ost_plot = Plot.plot({
 ```
 
 ```js
-// create input
-const pointMax = Inputs.range([0, 10], {step: 1, value: 10, width: 60});
+//const pointMax = Inputs.range([0, maxConcentration], {step: 1, value: maxConcentration, width: 60});
 ```
 
-<div class="grid grid-cols-4">
+<div class="grid grid-cols-4" >
   <div class="card grid-colspan-2 grid-rowspan-1" style="padding: 0px;">
     <div style="padding: 1rem;">
       <h2><strong>Floats trajectories</strong></h2>
@@ -299,7 +304,6 @@ const pointMax = Inputs.range([0, 10], {step: 1, value: 10, width: 60});
   <h2><strong>Particle concentrations</strong></h2>
   <h3>Filter points out by decreasing the maximum concentration value</h3>
   <div style="display: flex; flex-direction: column; align-items: center;">
-    <div>${pointMax}</div>
   </div>
   ${particle_plot}
 </div>
@@ -308,4 +312,8 @@ const pointMax = Inputs.range([0, 10], {step: 1, value: 10, width: 60});
   <h2><strong>Optical sediment trap</strong></h2>
   <h3>Small particle flux</h3>
   ${ost_plot}
+</div>
+
+<div class="small note">
+  These data were collected and made freely available by the <a href="https://argo.ucsd.edu">International Argo Program</a> and the national programs that contribute to it. The Argo Program is part of the Global Ocean Observing System.
 </div>

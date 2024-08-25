@@ -91,15 +91,6 @@ WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794,
 tmp <- map_dfr(WMO, ~extract_LPM(paste0("/home/fricour/test/argo_trajectory_files/", .x, "/", .x, "_Rtraj_aux.nc"))) |>
   bind_rows()
 
-# some cleaning
-#tmp$juld <- format(tmp$juld, "%Y-%m-%d")
-tmp <- tmp %>%
-    mutate(across(where(~ is.array(.x)), ~ as.double(unlist(.)))) %>%
-    pivot_longer(cols = starts_with("NP_Size_"), names_to = "size", values_to = "concentration") |>
-    mutate(size = as.numeric(str_split_i(size, '_', 3))) |>
-    mutate(juld = as_datetime(juld)) # datetime object needed because Plot doesn’t parse dates; convert your strings to Date instances with d3.utcParse or d3.autoType, or by passing typed: true to Observable’s FileAttachment function.
-    # check info here: https://observablehq.com/@ee2dev/analyzing-time-series-data-with-plot
-
 # example here: https://github.com/observablehq/data-loader-examples/blob/main/docs/data/penguin-kmeans.csv.R
 #cat(format_csv(tmp))
 
