@@ -219,8 +219,9 @@ const particle_plot = Plot.plot({
     Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
-      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nConcentration: ${d.concentration.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m`
     })),
+    Plot.crosshair(particle_filtered, {x: "juld", y: "concentration"}),
     Plot.lineY(particle_filtered, Plot.windowY({
         k:60, 
         reduce: "median",
@@ -263,7 +264,7 @@ const pss_plot = Plot.plot({
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
-      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nMean slope: ${d.mean_slope.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m`
     })),
     Plot.lineY(pss_filtered, Plot.windowY({
       k:12, 
@@ -272,7 +273,8 @@ const pss_plot = Plot.plot({
       y: "mean_slope", 
       stroke: d => colorScale(d.wmo),
       strokeWidth: 3, 
-      z: d => `${d.wmo}-${d.park_depth}`}))
+      z: d => `${d.wmo}-${d.park_depth}`})),
+    Plot.crosshair(pss_filtered, {x: "date", y: "mean_slope"})
   ],
   y: {
     label: "Mean slope",
@@ -296,7 +298,7 @@ const pss_plot = Plot.plot({
 const ost_plot = Plot.plot({
   marks: [
     Plot.dot(ost_filtered, {
-      y: "small_flux",
+      y: "total_flux",
       x: "max_time",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
       //fill: "wmo",
@@ -305,22 +307,23 @@ const ost_plot = Plot.plot({
       symbol: "park_depth"
     }),
     Plot.tip(ost_filtered, Plot.pointer({
-      y: "small_flux",
+      y: "total_flux",
       x: "max_time",
-      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}\nLarge flux: ${d.large_flux.toFixed(2)}`
     })),
     Plot.lineY(ost_filtered, Plot.windowY({
       k:12, 
       reduce: "median", 
       x: "max_time", 
-      y: "small_flux", 
+      y: "total_flux", 
       stroke: d => colorScale(d.wmo),
       //stroke: "wmo",
       strokeWidth: 3,
-      z: d => `${d.wmo}-${d.park_depth}`}))
+      z: d => `${d.wmo}-${d.park_depth}`})),
+    Plot.crosshair(ost_filtered, {x: "max_time", y: "total_flux"})
   ],
   y: {
-    label:  "Small particle flux (mg C m⁻² d⁻¹)",
+    label:  "Total particle flux (mg C m⁻² d⁻¹)",
     reverse: false
   },
   x: {
@@ -362,9 +365,9 @@ const ost_plot = Plot.plot({
   ${particle_plot}
 </div>
 
-<div class="card grid-colspan-2 grid-rowspan-1">
-  <h2><strong>Optical sediment trap</strong></h2>
-  <h3>Small particle flux computed following the method described in <a href='10.17882/94676'>Terrats et al., (2023)</a></h3>
+<div class="card grid-colspan-2 grid-rowspan-0.5">
+  <h2><strong>Total carbon flux derived from the optical sediment trap</strong></h2>
+  <h3>Total (small and large) particle flux computed following the method described in <a href='https://doi.org/10.1029/2022GB007624'>Terrats et al., (2023)</a></h3>
   ${ost_plot}
 </div>
 

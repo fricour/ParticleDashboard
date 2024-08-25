@@ -314,12 +314,15 @@ remove_outliers <- function(x) {
   return(x)
 }
 
-# remove outliers
 tmp <- tmp |>
-        group_by(wmo, park_depth) |>
-        mutate(small_flux = remove_outliers(small_flux)) |>
-        filter(!is.na(small_flux))
-
+  mutate(max_time = lubridate::date(max_time)) |>
+  mutate(max_time = lubridate::as_datetime(max_time)) |>
+  select(-min_time) |>
+  rowwise() |>
+  mutate(total_flux = small_flux + large_flux) |>
+  group_by(wmo, park_depth) |>
+  mutate(total_flux = remove_outliers(total_flux)) |>
+  filter(!is.na(total_flux))
 
 #cat(readr::format_csv(tmp))
 temp_file <- tempfile(fileext = ".parquet")
