@@ -306,6 +306,21 @@ WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794,
 
 tmp <- purrr::map_dfr(WMO, extract_ost_data, path_to_data = path_to_data)
 
+# Function to remove outliers based on IQR
+remove_outliers <- function(x) {
+  qnt <- quantile(x, probs=c(.25, .75), na.rm = TRUE)
+  H <- 1.5 * IQR(x, na.rm = TRUE)
+  x[x < (qnt[1] - H) | x > (qnt[2] + H)] <- NA
+  return(x)
+}
+
+# remove outliers
+tmp <- tmp |>
+        group_by(wmo, park_depth) |>
+        mutate(small_flux = remove_outliers(small_flux)) |>
+        filter(!is.na(small_flux))
+
+
 #cat(readr::format_csv(tmp))
 temp_file <- tempfile(fileext = ".parquet")
 arrow::write_parquet(tmp, sink = temp_file)

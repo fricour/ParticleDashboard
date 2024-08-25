@@ -9,6 +9,11 @@ sql:
 # Particles data from Biogeochemical-Argo floats
 
 ## Data from [Argo GDAC](http://www.argodatamgt.org/Access-to-data/Argo-GDAC-ftp-https-and-s3-servers)
+```js
+// Load the required libraries for leaflet map, see here https://observablehq.com/framework/imports
+//import { scaleLinear } from 'npm:d3-scale';
+//import { interpolateViridis } from 'npm:d3-scale-chromatic';
+```
 
 ```js
 //
@@ -17,7 +22,7 @@ sql:
 
 // changed my mind with this resource https://observablehq.com/framework/sql for the big dataset (not the trajectory one for the leaflet map)
 // Particle data
-//const argo = FileAttachment("LPM_data.parquet").parquet();
+//const argo = FileAttachment("LPM_data.parquet").parquet(); // need to rerun when the file changes (won't work with the sql header only)
 
 // Trajectory data
 const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
@@ -26,7 +31,7 @@ const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 //const size_spectra = FileAttachment("size_spectra.parquet").parquet();
 
 // OST data
-//const ost_data = FileAttachment("optical_sediment_trap.parquet").parquet();
+const ost_data = FileAttachment("optical_sediment_trap.parquet").parquet();
 ```
 
 ```js
@@ -58,7 +63,7 @@ const pickSizeClass = view(
     lpm_classes,
     {
       multiple: false,
-      label: "Pick a size class:",
+      label: "Size class (µm)",
       unique: true,
       sort: false,
       value: 102
@@ -71,7 +76,7 @@ const pickDepth = view(
     park_depths,
     {
       multiple: true,
-      label: "Pick a depth:",
+      label: "Parking depth (m)",
       unique: true,
       sort: false,
       value: [1000]
@@ -84,7 +89,7 @@ const pickFloat = view(
    wmo,
     {
       multiple: 5,
-      label: "Pick a float:",
+      label: "Float WMO",
       unique: true,
       sort: false,
       value: [1902578]
@@ -158,20 +163,38 @@ groupedData.forEach((floatData, wmo) => {
   
   // Create a polyline for the trajectory
   const polyline = L.polyline(latlngs, {
-    color: colorScale(wmo),
-    weight: 5,
+    //color: colorScale(wmo),
+    color: "#FF9900",
+    weight: 3,
     opacity: 0.7
   }).addTo(map);
+
+  // Add hover effect
+  polyline.on('mouseover', function(e) {
+    this.setStyle({
+      color: 'white',
+      weight: 8
+    });
+  });
+  polyline.on('mouseout', function(e) {
+    this.setStyle({
+      //color: colorScale(wmo),
+      color: '#FF9900',
+      weight: 5,
+      opacity: 0.7
+    });
+  });
   
   // Add to our array of all polylines
   allPolylines.push(polyline);
   
-  // Add a marker for the start point
+  // Add a marker for the last position
   L.circleMarker(latlngs[latlngs.length - 1], {
-    color: colorScale(wmo),
+    //color: colorScale(wmo),
+    color: "#00A699 ",
     fillColor: "black",
     fillOpacity: 0.5,
-    radius: 5
+    radius: 2
   }).addTo(map)
     .bindPopup(`Float: ${wmo}<br>Last update on ${floatData[floatData.length - 1].date}`);
 });
@@ -184,18 +207,29 @@ const group = L.featureGroup(allPolylines);
 // Create the particle plot (when floats have reached their parking depth)
 const particle_plot = Plot.plot({
   marks: [
-    Plot.dot(particle_filtered, Plot.hexbin({r: "count", fill: "min"}, {
+    Plot.dot(particle_filtered, {
       y: "concentration",
       x: "juld",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
-      r: 3
-    })),
+      //fill: "wmo",
+      r: 1,
+      opacity: 0.5,
+      //symbol: "park_depth"
+    }),
     Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
       title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nConcentration: ${d.concentration.toFixed(2)}`
     })),
-    Plot.lineY(particle_filtered, Plot.windowY({k:60, reduce: "median"}, {x: "juld", y: "concentration", stroke: "transparent", strokeWidth: 5}))
+    Plot.lineY(particle_filtered, Plot.windowY({
+        k:60, 
+        reduce: "median",
+        x: "juld", 
+        y: "concentration", 
+        stroke: d => colorScale(d.wmo), 
+        //stroke: "wmo",
+        strokeWidth: 3, 
+        z: d => `${d.wmo}-${d.park_depth}`})) // multiple groups (wmo and park depth)
   ],
   y: {
     label: "Concentration (#/L)",
@@ -222,14 +256,23 @@ const pss_plot = Plot.plot({
       y: "mean_slope",
       x: "date",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
-      r: 1
+      r: 3,
+      opacity: 0.5,
+      symbol: "park_depth"
     }),
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
       title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nMean slope: ${d.mean_slope.toFixed(2)}`
     })),
-    Plot.lineY(pss_filtered, Plot.windowY({k:12, reduce: "median"}, {x: "date", y: "mean_slope", stroke: d => colorScale(d.wmo), strokeWidth: 4}))
+    Plot.lineY(pss_filtered, Plot.windowY({
+      k:12, 
+      reduce: "median", 
+      x: "date", 
+      y: "mean_slope", 
+      stroke: d => colorScale(d.wmo),
+      strokeWidth: 3, 
+      z: d => `${d.wmo}-${d.park_depth}`}))
   ],
   y: {
     label: "Mean slope",
@@ -256,17 +299,28 @@ const ost_plot = Plot.plot({
       y: "small_flux",
       x: "max_time",
       fill: d => colorScale(d.wmo),  // Use the custom color scale
-      r: 2
+      //fill: "wmo",
+      r: 3,
+      opacity: 0.5,
+      symbol: "park_depth"
     }),
     Plot.tip(ost_filtered, Plot.pointer({
       y: "small_flux",
       x: "max_time",
       title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}`
     })),
-    Plot.lineY(ost_filtered, Plot.windowY({k:12, reduce: "median"}, {x: "max_time", y: "small_flux", stroke: d => colorScale(d.wmo), strokeWidth: 4})),
+    Plot.lineY(ost_filtered, Plot.windowY({
+      k:12, 
+      reduce: "median", 
+      x: "max_time", 
+      y: "small_flux", 
+      stroke: d => colorScale(d.wmo),
+      //stroke: "wmo",
+      strokeWidth: 3,
+      z: d => `${d.wmo}-${d.park_depth}`}))
   ],
   y: {
-    label: "Small particle flux",
+    label:  "Small particle flux (mg C m⁻² d⁻¹)",
     reverse: false
   },
   x: {
@@ -290,19 +344,19 @@ const ost_plot = Plot.plot({
   <div class="card grid-colspan-2 grid-rowspan-1" style="padding: 0px;">
     <div style="padding: 1rem;">
       <h2><strong>Floats trajectories</strong></h2>
-      <h3>Black markers show the last file update</h3>
+      <h3>Green markers show the last float position</h3>
       ${div}
     </div>
   </div>
   <div class="card grid-colspan-2 grid-rowspan-1">
     <h2><strong>Particle size spectra</strong></h2>
-    <h3>Mean slope of particle size spectra</h3>
+    <h3>A very negative slope in a particle size spectrum indicates that the concentration of particles decreases rapidly as the particle size increases.</h3>
     ${pss_plot}
 </div>
 
 <div class="card grid-colspan-2 grid-rowspan-1">
   <h2><strong>Particle concentrations</strong></h2>
-  <h3>Filter points out by decreasing the maximum concentration value</h3>
+  <h3>Measured with the <a href="http://www.hydroptic.com/index.php/public/Page/product_item/UVP6-LP">Underwater Vision Profiler 6 (UVP6).</a></h3>
   <div style="display: flex; flex-direction: column; align-items: center;">
   </div>
   ${particle_plot}
@@ -310,10 +364,14 @@ const ost_plot = Plot.plot({
 
 <div class="card grid-colspan-2 grid-rowspan-1">
   <h2><strong>Optical sediment trap</strong></h2>
-  <h3>Small particle flux</h3>
+  <h3>Small particle flux computed following the method described in <a href='10.17882/94676'>Terrats et al., (2023)</a></h3>
   ${ost_plot}
 </div>
 
 <div class="small note">
+  The Underwater Vision Profiler 6 (UVP6)</a> is an imaging system developed to characterize particles such as their size, gray level and also their taxonomic group with an embedded classification algorithm.<br><br>
+  The transmissometer measures the transmittance of a light beam at a given wavelength through a medium. In order to get the data presented above, the transmissometer, mounted on autonomous floats, is vertically oriented in order to measure the particle accumulation on the upward-facing optical window when the float is drifting (i.e. parked at a specific depth). As a result, the transmissometer operates as an optical sediment trap (OST).<br><br>
+  A k-day moving median average has been applied to highlight the trends. k = 60 for the particle concentrations and k = 12 for the optical sediment trap and particle size spectra data.<br><br>
+  Outliers for both the particle concentrations and optical sediment trap plots were removed using the <a href='https://en.wikipedia.org/wiki/Interquartile_range#Outliers'>IQR method</a>.<br><br>
   These data were collected and made freely available by the <a href="https://argo.ucsd.edu">International Argo Program</a> and the national programs that contribute to it. The Argo Program is part of the Global Ocean Observing System.
 </div>
