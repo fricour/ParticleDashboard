@@ -31,7 +31,10 @@ const traj_argo = FileAttachment("trajectory_data.csv").csv({typed: true});
 //const size_spectra = FileAttachment("size_spectra.parquet").parquet();
 
 // OST data
-const ost_data = FileAttachment("optical_sediment_trap.parquet").parquet();
+//const ost_data = FileAttachment("optical_sediment_trap.parquet").parquet();
+
+// Taxo data
+//const taxo_data = FileAttachment("taxo_data.parquet").parquet();
 ```
 
 ```js
