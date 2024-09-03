@@ -12,6 +12,9 @@ extract_taxo <- function(ncfile, class_number){
        'Foraminifera', 'Rhizaria', 'Salpida', 'artefact', 'crystal',
        'detritus', 'fiber', 'other<living', 'puff', 'small<Cnidaria',
        'solitaryglobule', 'tuff')
+    
+    #print(ncfile)
+    #print(class_number)
 
     # open NetCDF
     nc_data <- try(ncdf4::nc_open(ncfile))
@@ -63,16 +66,22 @@ classes <- seq(1, 20, 1)
 #tmp <- map_dfr(WMO, ~extract_taxo(paste0("/home/fricour/test/argo_trajectory_files/", .x, "/", .x, "_Rtraj_aux.nc"), class_number = 14)) |>
 #  bind_rows()
 
-tmp <- extract_taxo("/home/fricour/test/argo_trajectory_files/6904240/6904240_Rtraj_aux.nc", class_number = 14)
+#tmp <- extract_taxo("/home/fricour/test/argo_trajectory_files/6904240/6904240_Rtraj_aux.nc", class_number = 14)
 
-#tmp <- map_dfr(WMO, function(wmo) {
-#  map_dfr(classes, function(class) {
-#    extract_taxo(paste0("/home/fricour/test/argo_trajectory_files/", wmo, "/", wmo, "_Rtraj_aux.nc"), class = class) 
-#  })
-#})
+tmp <- map_dfr(WMO, ~map_dfr(classes, function(class) {
+  extract_taxo(
+    paste0("/home/fricour/test/argo_trajectory_files/", .x, "/", .x, "_Rtraj_aux.nc"),
+    class_number = class
+  )
+}))
+
 
 # Write the data frame to a temporary Parquet file
 temp_file <- tempfile(fileext = ".parquet")
 arrow::write_parquet(tmp, sink = temp_file)
 
 system2('/bin/cat', args = temp_file)
+
+
+#wmo <- 6904240
+#test <- map_dfr(classes, ~extract_taxo(paste0("/home/fricour/test/argo_trajectory_files/", wmo, "/", wmo, "_Rtraj_aux.nc"), class_number = .x))

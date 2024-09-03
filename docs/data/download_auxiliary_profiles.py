@@ -13,6 +13,7 @@ def get_file_list(wmo):
     BASE_URL = f"https://data-argo.ifremer.fr/aux/coriolis/{wmo}/profiles/"
     response = requests.get(BASE_URL)
     if response.status_code == 200:
+        print(f"Accessing URL for WMO {wmo} OK")
         soup = BeautifulSoup(response.text, 'html.parser')
         print(soup)
         return BASE_URL, [link.get('href') for link in soup.find_all('a') if link.get('href').endswith('.nc')]
@@ -35,6 +36,7 @@ def download_file(base_url, file_name, wmo):
     response = requests.get(file_url)
     if response.status_code == 200:
         with open(local_path, 'wb') as file:
+            print(f"Downloading {file_name} for WMO {wmo}")
             file.write(response.content)
         print(f"Downloaded: {file_name} for WMO {wmo}")
         return True

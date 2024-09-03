@@ -112,7 +112,21 @@ remove_outliers <- function(x) {
 tmp <- tmp |>
           group_by(wmo, size, cycle, park_depth) |>
           mutate(concentration = remove_outliers(concentration)) |>
-          filter(!is.na(concentration))
+          filter(!is.na(concentration)) |>
+          dplyr::mutate(zone = dplyr::case_when(
+            wmo %in% c(6904240, 6904241, 1902578, 4903634) ~ 'Labrador Sea',
+            wmo %in% c(4903660, 6990514) ~ 'Arabian Sea',
+            wmo %in% c(3902498, 1902601) ~ 'Guinea Dome',
+            wmo %in% c(1902637, 4903740, 4903739) ~ 'Apero mission',
+            wmo %in% c(2903787, 4903657) ~ 'West Kerguelen',
+            wmo %in% c(1902593, 4903658) ~ 'East Kerguelen',
+            wmo %in% c(5906970, 3902473, 6990503, 3902471) ~ 'Tropical Indian Ocean',
+            wmo %in% c(2903783) ~ 'South Pacific Gyre',
+            wmo %in% c(6903093, 6903094) ~'California Current',
+            wmo %in% c(7901028, 2903794) ~ 'Nordic Seas',
+            wmo %in% c(1902685) ~ 'North Pacific Gyre',
+          .default = NA
+        )) 
 
 
 # example here: https://github.com/observablehq/data-loader-examples/blob/main/docs/data/penguin-kmeans.csv.R

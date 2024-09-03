@@ -21,8 +21,10 @@ def download_file(wmo):
         os.makedirs(local_dir)
     
     response = requests.get(file_url)
+    print(response)
     if response.status_code == 200:
         with open(local_path, 'wb') as file:
+            print(f"Downloading {file_name} for WMO {wmo}...")
             file.write(response.content)
         print(f"Downloaded: {file_name} for WMO {wmo}")
         return True

@@ -54,6 +54,10 @@ const colorPalette = [
   "#1f77b4", "#ff7f0e", "#2ca02c", "#d62728", "#9467bd",
   "#8c564b", "#e377c2", "#7f7f7f", "#bcbd22", "#17becf"
 ];
+
+// oceanic zones
+const zones = ["Labrador Sea", "East Kerguelen", "Guinea Dome", "Apero mission", "North Pacific Gyre", "South Pacific Gyre", "West Kerguelen",
+"Nordic Seas", "Tropical Indian Ocean", "Arabian Sea"]
 ```
 
 ```js
@@ -99,33 +103,30 @@ const pickFloat = view(
     }
   )
 );
+
+const colorByRegion = view(
+  Inputs.toggle({label: "Colour by region", value: false}
+  ));
 ```
 
 ```js
-// switched to this because the sql query
-//SELECT park_depth, wmo, size, concentration, juld
-//FROM particle
-//WHERE size = ${pickSizeClass}
-//  AND park_depth = ${pickDepth}
-//  AND wmo IN (${pickFloat})
-// does not work with the IN operator
-const particle_filtered = await sql([`SELECT * park_depth, WMO, size, concentration, juld 
+const particle_filtered = await sql([`SELECT * park_depth, WMO, size, concentration, juld, zone
                                       FROM particle 
-                                      WHERE park_depth IN (${[pickDepth]}) 
+                                      WHERE park_depth IN (${pickDepth.length > 0 ? pickDepth.join(',') : 'NULL'})
                                       AND size IN (${[pickSizeClass]}) 
-                                      AND wmo IN (${[pickFloat]})`])
+                                      AND wmo IN (${pickFloat.length > 0 ? pickFloat.join(',') : 'NULL'})`])
 
 const maxConcentration = d3.max(particle_filtered, d => d.concentration);
 
 const ost_filtered = await sql([`SELECT * 
                                  FROM ost 
-                                 WHERE park_depth IN (${[pickDepth]}) 
-                                 AND wmo IN (${[pickFloat]})`])    
+                                 WHERE park_depth IN (${pickDepth.length > 0 ? pickDepth.join(',') : 'NULL'})
+                                 AND wmo IN (${pickFloat.length > 0 ? pickFloat.join(',') : 'NULL'})`])    
                                  
 const pss_filtered = await sql([`SELECT *
                                  FROM pss
-                                 WHERE park_depth IN (${[pickDepth]}) 
-                                 AND wmo IN (${[pickFloat]})`])
+                                 WHERE park_depth IN (${pickDepth.length > 0 ? pickDepth.join(',') : 'NULL'})
+                                 AND wmo IN (${pickFloat.length > 0 ? pickFloat.join(',') : 'NULL'})`])
 ```
 
 
@@ -140,16 +141,15 @@ const colorScale = d3.scaleOrdinal()
 // leaflet map to plot floats' trajectories
 // made with Claude Ai
 const div = display(document.createElement("div"));
-div.style = "height: 400px;";
+div.style = "height: 500px;";
 
 const map = L.map(div)
   .setView([0, 180], 2); // centered on Greenwich, zoom level 2
 
-L.tileLayer("https://tile.openstreetmap.org/{z}/{x}/{y}.png", {
-  maxZoom: 19, 
-  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a>'
-})
-  .addTo(map);
+L.tileLayer('https://{s}.basemaps.cartocdn.com/dark_nolabels/{z}/{x}/{y}{r}.png', {
+  attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors &copy; <a href="https://carto.com/attributions">CARTO</a>',
+  maxZoom: 20
+}).addTo(map);
 
 const groupedData = d3.group(traj_argo, d => d.wmo);
 
@@ -167,25 +167,34 @@ groupedData.forEach((floatData, wmo) => {
   // Create a polyline for the trajectory
   const polyline = L.polyline(latlngs, {
     //color: colorScale(wmo),
-    color: "#FF9900",
+    color: "#F0F0F0",
     weight: 3,
     opacity: 0.7
   }).addTo(map);
 
+  // Add a tooltip with the WMO identifier
+  polyline.bindTooltip(`WMO: ${wmo}`, {
+    permanent: false,
+    direction: 'top',
+    opacity: 0.7
+  });
+
   // Add hover effect
   polyline.on('mouseover', function(e) {
     this.setStyle({
-      color: 'white',
-      weight: 8
+      color: 'black',
+      weight: 5
     });
+    this.openTooltip();
   });
   polyline.on('mouseout', function(e) {
     this.setStyle({
       //color: colorScale(wmo),
-      color: '#FF9900',
+      color: '#F0F0F0',
       weight: 5,
       opacity: 0.7
     });
+    this.closeTooltip();
   });
   
   // Add to our array of all polylines
@@ -194,7 +203,7 @@ groupedData.forEach((floatData, wmo) => {
   // Add a marker for the last position
   L.circleMarker(latlngs[latlngs.length - 1], {
     //color: colorScale(wmo),
-    color: "#00A699 ",
+    color: "#B33951",
     fillColor: "black",
     fillOpacity: 0.5,
     radius: 2
@@ -213,25 +222,22 @@ const particle_plot = Plot.plot({
     Plot.dot(particle_filtered, {
       y: "concentration",
       x: "juld",
-      fill: d => colorScale(d.wmo),  // Use the custom color scale
-      //fill: "wmo",
+      fill: d => colorByRegion ? colorScale(d.zone) : colorScale(d.wmo), // Use the custom color scale
       r: 1,
       opacity: 0.5,
-      //symbol: "park_depth"
     }),
     Plot.tip(particle_filtered, Plot.pointer({
       y: "concentration",
       x: "juld",
-      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m`
+      title: d => `WMO: ${d.wmo}\nZone: ${d.zone}\nParking depth: ${d.park_depth} m`
     })),
     Plot.crosshair(particle_filtered, {x: "juld", y: "concentration"}),
     Plot.lineY(particle_filtered, Plot.windowY({
-        k:60, 
+        k: 60, 
         reduce: "median",
         x: "juld", 
         y: "concentration", 
-        stroke: d => colorScale(d.wmo), 
-        //stroke: "wmo",
+        stroke: d => colorByRegion ? colorScale(d.zone) : colorScale(d.wmo), 
         strokeWidth: 3, 
         z: d => `${d.wmo}-${d.park_depth}`})) // multiple groups (wmo and park depth)
   ],
@@ -259,7 +265,7 @@ const pss_plot = Plot.plot({
     Plot.dot(pss_filtered, {
       y: "mean_slope",
       x: "date",
-      fill: d => colorScale(d.wmo),  // Use the custom color scale
+      fill: d => colorByRegion ? colorScale(d.zone) : colorScale(d.wmo),  // Use the custom color scale
       r: 3,
       opacity: 0.5,
       symbol: "park_depth"
@@ -267,14 +273,14 @@ const pss_plot = Plot.plot({
     Plot.tip(pss_filtered, Plot.pointer({
       y: "mean_slope",
       x: "date",
-      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m`
+      title: d => `WMO: ${d.wmo}\nZone: ${d.zone}\nParking depth: ${d.park_depth} m`
     })),
     Plot.lineY(pss_filtered, Plot.windowY({
       k:12, 
       reduce: "median", 
       x: "date", 
       y: "mean_slope", 
-      stroke: d => colorScale(d.wmo),
+      stroke: d => colorByRegion ? colorScale(d.zone) : colorScale(d.wmo),
       strokeWidth: 3, 
       z: d => `${d.wmo}-${d.park_depth}`})),
     Plot.crosshair(pss_filtered, {x: "date", y: "mean_slope"})
@@ -303,8 +309,7 @@ const ost_plot = Plot.plot({
     Plot.dot(ost_filtered, {
       y: "total_flux",
       x: "max_time",
-      fill: d => colorScale(d.wmo),  // Use the custom color scale
-      //fill: "wmo",
+      fill: d => colorByRegion ? colorScale(d.zone) : colorScale(d.wmo),
       r: 3,
       opacity: 0.5,
       symbol: "park_depth"
@@ -312,15 +317,14 @@ const ost_plot = Plot.plot({
     Plot.tip(ost_filtered, Plot.pointer({
       y: "total_flux",
       x: "max_time",
-      title: d => `WMO: ${d.wmo}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}\nLarge flux: ${d.large_flux.toFixed(2)}`
+      title: d => `WMO: ${d.wmo}\nZone: ${d.zone}\nParking depth: ${d.park_depth} m\nSmall flux: ${d.small_flux.toFixed(2)}\nLarge flux: ${d.large_flux.toFixed(2)}`
     })),
     Plot.lineY(ost_filtered, Plot.windowY({
       k:12, 
       reduce: "median", 
       x: "max_time", 
       y: "total_flux", 
-      stroke: d => colorScale(d.wmo),
-      //stroke: "wmo",
+      stroke: d => colorByRegion ? colorScale(d.zone) : colorScale(d.wmo),
       strokeWidth: 3,
       z: d => `${d.wmo}-${d.park_depth}`})),
     Plot.crosshair(ost_filtered, {x: "max_time", y: "total_flux"})
@@ -350,7 +354,7 @@ const ost_plot = Plot.plot({
   <div class="card grid-colspan-2 grid-rowspan-1" style="padding: 0px;">
     <div style="padding: 1rem;">
       <h2><strong>Floats trajectories</strong></h2>
-      <h3>Green markers show the last float position</h3>
+      <h3>Red markers show the last float position</h3>
       ${div}
     </div>
   </div>
@@ -361,7 +365,7 @@ const ost_plot = Plot.plot({
 </div>
 
 <div class="card grid-colspan-2 grid-rowspan-1">
-  <h2><strong>Particle concentrations</strong></h2>
+  <h2><strong>Particle concentrations at parking depth</strong></h2>
   <h3>Measured with the <a href="http://www.hydroptic.com/index.php/public/Page/product_item/UVP6-LP">Underwater Vision Profiler 6 (UVP6).</a></h3>
   <div style="display: flex; flex-direction: column; align-items: center;">
   </div>
@@ -375,7 +379,7 @@ const ost_plot = Plot.plot({
 </div>
 
 <div class="small note">
-  The Underwater Vision Profiler 6 (UVP6)</a> is an imaging system developed to characterize particles such as their size, gray level and also their taxonomic group with an embedded classification algorithm.<br><br>
+  The Underwater Vision Profiler 6 (UVP6) is an underwater imaging system developed to measure the size and gray level of marine particles. A key feature of the UVP6 is its <a href= 'https://github.com/ecotaxa/uvpec'>integrated classification algorithm</a>, which can automatically categorize observed particles and organisms into various taxonomic groups.<br><br>
   The transmissometer measures the transmittance of a light beam at a given wavelength through a medium. In order to get the data presented above, the transmissometer, mounted on autonomous floats, is vertically oriented in order to measure the particle accumulation on the upward-facing optical window when the float is drifting (i.e. parked at a specific depth). As a result, the transmissometer operates as an optical sediment trap (OST).<br><br>
   A k-day moving median average has been applied to highlight the trends. k = 60 for the particle concentrations and k = 12 for the optical sediment trap and particle size spectra data.<br><br>
   Outliers for both the particle concentrations and optical sediment trap plots were removed using the <a href='https://en.wikipedia.org/wiki/Interquartile_range#Outliers'>IQR method</a>.<br><br>
