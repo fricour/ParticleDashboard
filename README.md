@@ -1,53 +1,15 @@
-# argodev
+# Biogeochemical-Argo Floats Particle Dashboard
 
-This is an [Observable Framework](https://observablehq.com/framework) project. To start the local preview server, run:
+## Overview
+This dashboard visualizes particle data collected from drifting Biogeochemical-Argo (BGC) floats (i.e. when those floats are parked at a given depth: 200 m, 500 m or 1000 m). 
+It provides an interactive interface to explore float trajectories, particle concentrations, size spectra, and carbon flux data.
 
-```
-npm run dev
-```
+## Data Source
+These data were collected and made freely available by the International Argo Program and the national programs that contribute to it. The Argo Program is part of the Global Ocean Observing System.
 
-Then visit <http://localhost:3000> to preview your project.
+## Data Selection
 
-For more, see <https://observablehq.com/framework/getting-started>.
-
-## Project structure
-
-A typical Framework project looks like this:
-
-```ini
-.
-├─ docs
-│  ├─ components
-│  │  └─ timeline.js           # an importable module
-│  ├─ data
-│  │  ├─ launches.csv.js       # a data loader
-│  │  └─ events.json           # a static data file
-│  ├─ example-dashboard.md     # a page
-│  ├─ example-report.md        # another page
-│  └─ index.md                 # the home page
-├─ .gitignore
-├─ observablehq.config.js      # the project config file
-├─ package.json
-└─ README.md
-```
-
-**`docs`** - This is the “source root” — where your source files live. Pages go here. Each page is a Markdown file. Observable Framework uses [file-based routing](https://observablehq.com/framework/routing), which means that the name of the file controls where the page is served. You can create as many pages as you like. Use folders to organize your pages.
-
-**`docs/index.md`** - This is the home page for your site. You can have as many additional pages as you’d like, but you should always have a home page, too.
-
-**`docs/data`** - You can put [data loaders](https://observablehq.com/framework/loaders) or static data files anywhere in your source root, but we recommend putting them here.
-
-**`docs/components`** - You can put shared [JavaScript modules](https://observablehq.com/framework/javascript/imports) anywhere in your source root, but we recommend putting them here. This helps you pull code out of Markdown files and into JavaScript modules, making it easier to reuse code across pages, write tests and run linters, and even share code with vanilla web applications.
-
-**`observablehq.config.js`** - This is the [project configuration](https://observablehq.com/framework/config) file, such as the pages and sections in the sidebar navigation, and the project’s title.
-
-## Command reference
-
-| Command           | Description                                              |
-| ----------------- | -------------------------------------------------------- |
-| `npm install`            | Install or reinstall dependencies                        |
-| `npm run dev`        | Start local preview server                               |
-| `npm run build`      | Build your static site, generating `./dist`              |
-| `npm run deploy`     | Deploy your project to Observable                        |
-| `npm run clean`      | Clear the local data loader cache                        |
-| `npm run observable` | Run commands like `observable help`                      |
+- Size class (μm): Select the particle size class to display in the particle concentration plot.
+- Parking depth (m): Choose from 200 m, 500 m, or 1000 m depths.
+- Float WMO: Pick specific floats by their WMO (World Meteorological Organization) numbers.
+- Color by region toggle: Option to color-code data by geographical regions.
