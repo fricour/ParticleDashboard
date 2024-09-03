@@ -1,9 +1,9 @@
 ---
 theme: dashboard
 sql: 
-  particle: ./.observablehq/cache/LPM_data.parquet
-  ost: ./.observablehq/cache/optical_sediment_trap.parquet
-  pss: ./.observablehq/cache/size_spectra.parquet
+  particle: LPM_data.parquet
+  ost: optical_sediment_trap.parquet
+  pss: size_spectra.parquet
 ---
 
 # Particles data from Biogeochemical-Argo floats
@@ -111,7 +111,7 @@ const colorByRegion = view(
 
 ```js
 const particle_filtered = await sql([`SELECT * park_depth, WMO, size, concentration, juld, zone
-                                      FROM particle 
+                                      FROM particle
                                       WHERE park_depth IN (${pickDepth.length > 0 ? pickDepth.join(',') : 'NULL'})
                                       AND size IN (${[pickSizeClass]}) 
                                       AND wmo IN (${pickFloat.length > 0 ? pickFloat.join(',') : 'NULL'})`])
@@ -380,7 +380,7 @@ const ost_plot = Plot.plot({
 
 <div class="small note">
   The Underwater Vision Profiler 6 (UVP6) is an underwater imaging system developed to measure the size and gray level of marine particles. A key feature of the UVP6 is its <a href= 'https://github.com/ecotaxa/uvpec'>integrated classification algorithm</a>, which can automatically categorize observed particles and organisms into various taxonomic groups.<br><br>
-  The transmissometer measures the transmittance of a light beam at a given wavelength through a medium. In order to get the data presented above, the transmissometer, mounted on autonomous floats, is vertically oriented in order to measure the particle accumulation on the upward-facing optical window when the float is drifting (i.e. parked at a specific depth). As a result, the transmissometer operates as an optical sediment trap (OST).<br><br>
+  The transmissometer measures the transmittance of a light beam at a given wavelength through a medium. In order to get the data presented above, the transmissometer, mounted on autonomous floats, is vertically oriented to measure the particle accumulation on the upward-facing optical window when the float is drifting (i.e., parked at a specific depth). As a result, the transmissometer operates as an optical sediment trap (OST).<br><br>
   A k-day moving median average has been applied to highlight the trends. k = 60 for the particle concentrations and k = 12 for the optical sediment trap and particle size spectra data.<br><br>
   Outliers for both the particle concentrations and optical sediment trap plots were removed using the <a href='https://en.wikipedia.org/wiki/Interquartile_range#Outliers'>IQR method</a>.<br><br>
   These data were collected and made freely available by the <a href="https://argo.ucsd.edu">International Argo Program</a> and the national programs that contribute to it. The Argo Program is part of the Global Ocean Observing System.

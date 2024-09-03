@@ -1,87 +1,50 @@
+# extract particle data at parking depth
 extract_LPM <- function(ncfile){
 
   # open NetCDF
-  nc_data <- try(ncdf4::nc_open(ncfile))
-  if(class(nc_data) == 'try-error'){
-    return(0)
-  }else{
-    # extract pressure field
-    pres <- ncdf4::ncvar_get(nc_data, 'PRES')
-    # extract measurement code
-    mc <- ncdf4::ncvar_get(nc_data, 'MEASUREMENT_CODE')
-    # extract time
-    juld <- ncdf4::ncvar_get(nc_data, 'JULD')
-    # extract cycle number
-    cycle <- ncdf4::ncvar_get(nc_data, 'CYCLE_NUMBER')
-    # extract wmo (and remove leading and trailing whitespaces)
-    wmo <- stringr::str_trim(ncdf4::ncvar_get(nc_data, 'PLATFORM_NUMBER'))
+  nc_data <- ncdf4::nc_open(ncfile)
 
-    # extract particle size spectra
-    part_spectra <- try(ncdf4::ncvar_get(nc_data, 'NB_SIZE_SPECTRA_PARTICLES'))
+  # extract depth (pres), measurement code (mc), julian day, cycle number and particle size spectra
+  pres <- ncdf4::ncvar_get(nc_data, 'PRES')
+  mc <- ncdf4::ncvar_get(nc_data, 'MEASUREMENT_CODE')
+  juld <- ncdf4::ncvar_get(nc_data, 'JULD')
+  cycle <- ncdf4::ncvar_get(nc_data, 'CYCLE_NUMBER')
+  wmo <- stringr::str_trim(ncdf4::ncvar_get(nc_data, 'PLATFORM_NUMBER'))
+  part_spectra <- ncdf4::ncvar_get(nc_data, 'NB_SIZE_SPECTRA_PARTICLES')
 
-    if(class(part_spectra)[1] != 'try-error'){
+  # transpose part spectra matrix
+  part_spectra <- tibble::as_tibble(t(part_spectra))
 
-      # transpose part spectra matrix
-      part_spectra <- tibble::as_tibble(t(part_spectra))
-      # lpm classes
-      lpm_classes <- c('NP_Size_50.8','NP_Size_64','NP_Size_80.6', 'NP_Size_102','NP_Size_128','NP_Size_161','NP_Size_203',
+  # particle class sizes
+  lpm_classes <- c('NP_Size_50.8','NP_Size_64','NP_Size_80.6', 'NP_Size_102','NP_Size_128','NP_Size_161','NP_Size_203',
                        'NP_Size_256','NP_Size_323','NP_Size_406','NP_Size_512','NP_Size_645','NP_Size_813','NP_Size_1020','NP_Size_1290',
                        'NP_Size_1630','NP_Size_2050','NP_Size_2580')
-      # rename columns
-      colnames(part_spectra) <- lpm_classes
+  # rename columns for clarity
+  colnames(part_spectra) <- lpm_classes
 
-      # extract number of images
-      image_number <- ncdf4::ncvar_get(nc_data, 'NB_IMAGE_PARTICLES')
+  # extract number of images
+  image_number <- ncdf4::ncvar_get(nc_data, 'NB_IMAGE_PARTICLES')
 
-      # divide particle concentrations by number of images
-      part_spectra <- part_spectra |>
-       dplyr::mutate(dplyr::across(NP_Size_50.8:NP_Size_2580, ~.x/(0.7*image_number))) # 0.7 = UVP6 image volume
+  # finalize dataframe
+  part_spectra <- part_spectra |> # # divide particle concentrations by number of images, 0.7L = UVP6 image volume
+    dplyr::mutate(dplyr::across(NP_Size_50.8:NP_Size_2580, ~.x/(0.7*image_number))) |> # add data extracted from NetCDF
+    dplyr::mutate(depth = pres, mc = mc, cycle = cycle, juld = juld, wmo = as.character(wmo)) |> # convert julian day to human time
+    dplyr::mutate(juld = oce::argoJuldToTime(juld)) |> # drop NA in particle size spectra
+    tidyr::drop_na(NP_Size_50.8) |> # only keep data when the float is parked
+    dplyr::filter(mc == 290) |> # remove measurement code (not needed anymore)
+    dplyr::select(-mc) |> # define "standard" parking depths (200 m, 500 m and 1000 m)
+    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500))) |> # reorder tibble
+    dplyr::select(depth, park_depth, cycle, juld, dplyr::everything()) |> # remove some weird numbers associated to BAD QCs (but all QCs are at 0 so not JULD_QC is not useful here)
+    dplyr::filter(juld > '2021-01-01', juld < '2025-01-01') |> # format time data
+    dplyr::mutate(juld = format(juld, "%Y-%m-%d"))
 
-      # add depth/juld/cycle to part_spectra
-      part_spectra$depth <- pres
-      part_spectra$mc <- mc
-      part_spectra$cycle <- cycle
-      part_spectra$juld <- juld
-      part_spectra$wmo <- as.character(wmo)
+    # close NetCDF
+    ncdf4::nc_close(nc_data)
 
-      # convert julian day to human time
-      part_spectra <- part_spectra |>
-       dplyr::mutate(juld = oce::argoJuldToTime(juld))
-
-      # drop NA in particle size spectra
-      part_spectra <- part_spectra |>
-       tidyr::drop_na(NP_Size_50.8)
-
-      # keep data when the float is parked
-      part_spectra <- part_spectra |>
-        dplyr::filter(mc == 290) |>
-        dplyr::select(-mc)
-
-      # define "standard" parking depths (200 m, 500 m and 1000 m)
-      part_spectra <- part_spectra |>
-       dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500)))
-
-      # reorder tibble
-      part_spectra <- part_spectra |>
-       dplyr::select(depth, park_depth, cycle, juld, dplyr::everything())
-
-      # remove some weird numbers associated to BAD QCs (but all QCs are at 0 so not JULD_QC is not useful here)
-      part_spectra <- part_spectra |>
-       dplyr::filter(juld > '2021-01-01', juld < '2025-01-01')
-
-      # format data
-      part_spectra$juld <- format(part_spectra$juld, "%Y-%m-%d")
-
-      # close NetCDF
-      ncdf4::nc_close(nc_data)
-
-      return(part_spectra)
-    }else{ # no particle data in the NetCDF
-      return(0)
-    }
-  }
+    return(part_spectra)
 }
 
+# compute spectral slope
 compute_spectral_slope <- function(wmo_float, path_to_data){
 
   # extract UVP data at parking
@@ -89,7 +52,6 @@ compute_spectral_slope <- function(wmo_float, path_to_data){
   data <- extract_LPM(ncfile)
 
   # particle size classes
-  #print(wmo_float)
   lpm_classes <- c('NP_Size_102','NP_Size_128','NP_Size_161','NP_Size_203',
                    'NP_Size_256','NP_Size_323','NP_Size_406','NP_Size_512','NP_Size_645','NP_Size_813','NP_Size_1020','NP_Size_1290',
                    'NP_Size_1630','NP_Size_2050')
@@ -148,9 +110,9 @@ compute_slope <- function(i, data_spectra, mid_DSE, size_bin){
   return(slope)
 }
 
+# extract particle size spectra 
 WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028)
-
-tmp <- purrr::map_dfr(WMO, compute_spectral_slope, path_to_data = '/home/fricour/test/argo_trajectory_files/')
+tmp <- purrr::map_dfr(WMO, compute_spectral_slope, path_to_data = './docs/data/argo_trajectory_files/')
 
 # clean for format_csv
 tmp <- tmp |>
@@ -171,10 +133,7 @@ tmp <- tmp |>
      .default = NA
     )) 
 
-
-#compute_spectral_slope(WMO[1], '/home/fricour/test/argo_trajectory_files/')
-#cat(readr::format_csv(tmp))
-
+# save to parquet (standard output)
 temp_file <- tempfile(fileext = ".parquet")
 arrow::write_parquet(tmp, sink = temp_file)
 

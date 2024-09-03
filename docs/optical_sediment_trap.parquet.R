@@ -70,17 +70,17 @@ slide <- function(x, k, fun, n=1, ...) {
   return(x)
 }
 
+# extract transmissometer data
 extract_cp_data <- function(wmo, path_to_data){
 
-  ncfile <- paste0(path_to_data,wmo,'/',wmo,'_Rtraj.nc')
+  ncfile <- paste0(path_to_data, wmo ,'/', wmo, '_Rtraj.nc')
 
   # open netcdf
-  nc_data <- ncdf4::nc_open(ncfile) # Rtraj files should ALWAYS exist so I am not testing it
+  nc_data <- ncdf4::nc_open(ncfile) # Rtraj files should ALWAYS exist for this application so I am not checking if it is...
 
-  # extract parameter
-  #value <- try(ncdf4::ncvar_get(nc_data, 'TRANSMITTANCE_PARTICLE_BEAM_ATTENUATION660'))
+  # extract data from NetCDF
   value <- try(ncdf4::ncvar_get(nc_data, 'CP660'))
-  depth <- ncdf4::ncvar_get(nc_data, 'PRES') # TODO : take the PRES ADJUSTED when possible?
+  depth <- ncdf4::ncvar_get(nc_data, 'PRES') 
   mc <- ncdf4::ncvar_get(nc_data, 'MEASUREMENT_CODE')
   juld <- ncdf4::ncvar_get(nc_data, 'JULD')
   juld <- oce::argoJuldToTime(juld)
@@ -109,17 +109,11 @@ extract_cp_data <- function(wmo, path_to_data){
   # make final tibble
   tib <- tibble::tibble(wmo = wmo, cycle = cycle, juld = juld, mc = mc, depth = depth, cp = value, qc = qc)
   # clean data
-  tib <- tib %>%
-    dplyr::filter(cycle >= 1, mc == 290) %>%
-    tidyr::drop_na(cp) %>%
-    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500))) %>%
+  tib <- tib |>
+    dplyr::filter(cycle >= 1, mc == 290) |>
+    tidyr::drop_na(cp) |>
+    dplyr::mutate(park_depth = dplyr::if_else(depth < 350, 200, dplyr::if_else(depth > 750, 1000, 500))) |>
     dplyr::select(-mc)
-
-  # # convert cp data to physical data
-  # CSCdark <- RefineParking::c_rover_calib[RefineParking::c_rover_calib$WMO == wmo,]$CSCdark
-  # CSCcal <- RefineParking::c_rover_calib[RefineParking::c_rover_calib$WMO == wmo,]$CSCcal
-  # x <- 0.25
-  # tib <- tib %>% dplyr::mutate(cp = -log((cp - CSCdark)/(CSCcal-CSCdark))/x)
 
   # close nc file
   ncdf4::nc_close(nc_data)
@@ -127,11 +121,12 @@ extract_cp_data <- function(wmo, path_to_data){
   return(tib)
 }
 
+# derive optical sediment trap flux
 derive_ost_flux <- function(data, wmo_float){
 
   # make sure that the cp signal is in chronological order
-  tmp <- data %>%
-    dplyr::filter(wmo == wmo_float) %>%
+  tmp <- data |>
+    dplyr::filter(wmo == wmo_float) |>
     dplyr::arrange(juld)
 
   # despike cp data with a 7-point moving window
@@ -146,7 +141,8 @@ derive_ost_flux <- function(data, wmo_float){
   tmp$slope <- delta_y/delta_x
 
   # compute a Z score (assuming a normal distribution of the slopes) on the slopes
-  tmp <- tmp %>% dplyr::mutate(zscore = (slope - mean(slope, na.rm = T))/sd(slope, na.rm = T))
+  tmp <- tmp |>
+     dplyr::mutate(zscore = (slope - mean(slope, na.rm = T))/sd(slope, na.rm = T))
 
   # spot outliers on the Z score signal
   # interquartile range between Q25 and Q75 -> had to used that and not the despike function because slopes are often close (or equal) to 0 so it can miss clear jumps. Q25 and Q75 are more trustworthy in this case than the despike function of Jean-Olivier (see package castr on his github: https://github.com/jiho/castr)
@@ -180,7 +176,7 @@ derive_ost_flux <- function(data, wmo_float){
   tmp$group[which(is.na(tmp$group))] <- 'last_group'
 
   # compute slope for each subgroup
-  slope_df <- tmp %>%
+  slope_df <- tmp |>
     dplyr::filter(colour == 'base signal', slope != 'NA') %>%
     dplyr::group_by(group) %>%
     dplyr::summarise(min_time = min(juld),
@@ -192,11 +188,11 @@ derive_ost_flux <- function(data, wmo_float){
                      delta_y = (last_cp-first_cp)*0.25, slope = delta_y/delta_x) # *0.25 to convert cp to ATN
 
   # remove negative slope from the mean slope (no physical meaning)
-  slope_df <- slope_df %>%
+  slope_df <- slope_df |>
     dplyr::filter(slope > 0)
 
   # remove if only one point (cannot fit a slope with one point) -> switched to 3 points
-  slope_df <- slope_df %>%
+  slope_df <- slope_df |>
     dplyr::filter(nb_points > 3)
 
   # compute weighted average slope (to take into account the fact that some subgroups might have 2 points and a high slope vs. large group of points with a small slope)
@@ -206,8 +202,8 @@ derive_ost_flux <- function(data, wmo_float){
   poc_flux <- 633*(mean_slope**0.77) # /!\ slope computed for ATN on y axis (delta_y *0.25 because ATN = cp*0.25) -> should be OK
 
   # build dataframe to plot each subgroup
-  part1 <- slope_df %>% dplyr::select(group, time = min_time, cp = first_cp)
-  part2 <- slope_df %>% dplyr::select(group, time = max_time, cp = last_cp)
+  part1 <- slope_df |> dplyr::select(group, time = min_time, cp = first_cp)
+  part2 <- slope_df |> dplyr::select(group, time = max_time, cp = last_cp)
   part_slope <- rbind(part1, part2)
 
   # spot negative jump
@@ -215,12 +211,15 @@ derive_ost_flux <- function(data, wmo_float){
 
   # add large particles flux to the party
   rows_to_keep <- c(jump_index, jump_index-1)
-  tmp2 <- tmp[rows_to_keep,] %>% dplyr::select(juld, cp, slope, colour, group) %>% dplyr::arrange(juld)
+  tmp2 <- tmp[rows_to_keep,] |> 
+    dplyr::select(juld, cp, slope, colour, group) |>
+    dplyr::arrange(juld)
 
   # remove negative jumps, if any
   check_colour <- unique(tmp2$colour)
   if(length(check_colour) >= 2){ # there is a least a jump (positive or negative)
-    tmp2 <- tmp2 %>% dplyr::mutate(diff_jump = cp - dplyr::lag(cp))
+    tmp2 <- tmp2 |>
+      dplyr::mutate(diff_jump = cp - dplyr::lag(cp))
     even_indexes <- seq(2,nrow(tmp2),2)
     tmp2 <- tmp2[even_indexes,]
   }else{ # No jump
@@ -231,7 +230,8 @@ derive_ost_flux <- function(data, wmo_float){
     large_part_poc_flux <- 0
     tmp3 <- NULL
   }else{
-    tmp3 <- tmp2 %>% dplyr::filter(diff_jump > 0)
+    tmp3 <- tmp2 |>
+       dplyr::filter(diff_jump > 0)
     if(nrow(tmp3) == 0){ # no positive jumps
       large_part_poc_flux <- 0
     }else{
@@ -250,28 +250,17 @@ derive_ost_flux <- function(data, wmo_float){
   drifting_time <- as.numeric(difftime(max_time, min_time, units = 'days'))
 
   # to plot subgroups
-  part_slope_tmp <- part_slope %>% dplyr::mutate(juld = time, colour = 'slope')
-
-  # plot
-  # jump_plot <- plotly::plot_ly(tmp, x = ~juld, y = ~cp, type = 'scatter', mode = 'markers', color = ~colour, colors = c('#003366','#E31B23', '#FFC325')) %>%
-  #   plotly::add_lines(data= part_slope_tmp, x = ~juld, y = ~cp, split = ~group, color = I('#DCEEF3'), showlegend = F) %>%
-  #   plotly::layout(title= paste0('Drifting time: ', round(drifting_time,3), ' days\n',
-  #                        'Mean ATN slope (light blue): ', round(mean_slope,3), ' day-1\n',
-  #                        'POC flux (small particles): ', round(poc_flux,1), ' mg C m-2 day-1\n',
-  #                        'POC flux (large particles): ', round(large_part_poc_flux,1), ' mg C m-2 day-1'), yaxis = list(title = 'Cp (1/m)'), xaxis = list(title = 'Time'))
-
-  #return(jump_plot)
-  #return(list('jump_plot' = jump_plot, 'jump_table' = tmp3))
+  part_slope_tmp <- part_slope |>
+   dplyr::mutate(juld = time, colour = 'slope')
 
   # adapt script to return large and small flux
   df <- tibble::tibble('max_time' = max_time, 'min_time' = min_time, 'small_flux' = poc_flux, 'large_flux' = large_part_poc_flux, park_depth = data$park_depth[1], wmo = data$wmo[1],
                cycle = data$cycle[1])
 
   return(df)
-  #return(jump_plot)
-
 }
 
+# extract optical sediment trap data
 extract_ost_data <- function(wmo_float, path_to_data){
 
   # parking depths (so far we only have those 3 but that might change in the future)
@@ -284,7 +273,7 @@ extract_ost_data <- function(wmo_float, path_to_data){
   max_cycle <- max(data$cycle)
   for (i in park_depth){
     for (j in seq(1:max_cycle)){
-      tmp <- data %>% dplyr::filter(park_depth == i, cycle == j)
+      tmp <- data |> dplyr::filter(park_depth == i, cycle == j)
       if(nrow(tmp) == 0){ # no data for this cycle or at this parking depth
         next
       }else if(nrow(tmp) < 3){ # case where there is not enough data
@@ -295,16 +284,8 @@ extract_ost_data <- function(wmo_float, path_to_data){
       }
     }
   }
-
   return(res)
-
 }
-
-path_to_data <- '/home/fricour/test/argo_core_trajectory_files/'
-
-WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028)
-
-tmp <- purrr::map_dfr(WMO, extract_ost_data, path_to_data = path_to_data)
 
 # Function to remove outliers based on IQR
 remove_outliers <- function(x) {
@@ -314,6 +295,12 @@ remove_outliers <- function(x) {
   return(x)
 }
 
+# extract data
+path_to_data <- './docs/data/argo_core_trajectory_files/'
+WMO <- c(1902578, 1902593, 1902601, 1902637, 1902685, 2903783, 2903787, 2903794, 3902471, 3902498, 4903634, 4903657, 4903658, 4903660, 4903739, 4903740, 5906970, 6904240, 6904241, 6990503, 6990514, 7901028)
+tmp <- purrr::map_dfr(WMO, extract_ost_data, path_to_data = path_to_data)
+
+# a bit of cleaning
 tmp <- tmp |>
   mutate(max_time = lubridate::date(max_time)) |>
   mutate(max_time = lubridate::as_datetime(max_time)) |>
